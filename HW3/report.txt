@@ -1,0 +1,143 @@
+Name: Anurag Yepuri	
+Stu ID: 113070893
+Sub: CSE 508 Network security
+
+Assignment 3 : DNS Poisoning and DNS spoofing Detection
+
+DNS Poison:
+
+Commands to run the dnspoison.go file.
+
+1) without hosts_file or interface
+	sudo go run dnspoison.go 
+		- When hostnames file is not provided it used a default ip given in the global parameters in the file. i.e it poisons all dns request with the given IP
+		- As the interface is not provided it used the first interface when it runs the FindAllDevs() function in gopacket.
+2) With Host_file and no Interface
+	sudo go run dnspoison.go -f <host_file_name path>
+		- As a hostfile is provided only the domains specified in the file are poisoned. The host_file contents are first read into a hashmap with domain name as key and Ips as values. When that specified hostname is visited in the victims system. The browser is redirected to the appropriate ip in the host_file file.
+		- As the interface is not provided it used the first interface when it runs the FindAllDevs() function in gopacket.
+3) With both Host_file and Interface
+	sudo go run dnspoison.go -f <host_file_name path> -i <interface_name>
+		- As a hostfile is provided only the domains specified in the file are poisoned. The host_file contents are first read into a hashmap with domain name as key and Ips as values. When that specified hostname is visited in the victims system. The browser is redirected to the appropriate ip in the host_file file.
+		- As the interface is provided it only poisons the request from devices of that specific interace.
+
+Approach/Design:
+1) The interface and hostnames flag are checked initially to decide the execution of the program.
+2) If hostnames file is provided then the values are kept into a hashmap to use it later on. 
+	If hostname is not provided. The a global variable is set to use a particular IP to return to all requests, poisoning all the dns requests going out from the victims system.
+3) Then we use the inteface flag variable to configure the exact interface that we should be reading the live network stream from.
+4) we append the Bpf filter with "udp and dst port 53" so that only valid DNS requests are captured for poisoning to make the code more efficient. If any BPF filter is provided, more filtering of packets is performed using the string provided in the commandline call.
+5) We open the pcap.OpenLive network listening on the specified interaface if provided. If none is provided, then we use the first interface in the list using pcap.FindAllDevs().
+6) If any DNS packet arrives. We check if the hostname is present in the hashmap using regular expressions if host_file is provided. If the domain is present. Then we create a spoofed DNS response using some attributed from the request packet. If hosts_file is not provided we poison all DNS request with an IP in programs global variables.
+	- use srcIP and dstIP (interchanged)
+	- use srcPort and dstPort (interchanged)
+	- use srcMAC and dstMAC (interchanged)
+	- Replicate Same Questions section in reponse packer.
+	- NetworkLayerForChecksum to link UDP and IP Layers into the packet.
+	- Create a new Answers with the response IP and inject it into the DNS layer of the packet.
+	- We will also have to set a few other flags in each layer to get it to work.
+
+7) We create the packet using the gopacket.SerializeLayers and write packet data into the network.
+8) If the packet arrives before the original response from the DNS server. Then it assumes this to be the packet and opens the IP that we provide in the spoofed response.
+
+
+DNS Spoofing Detection:
+
+We have two modes in this program.
+1) Use a live stream with an interface. If interface not provided we consider the default Interface.
+2) Use the code to check for DNS spoofed records in a existing pcap file.
+
+Command to run the dnsdetect.go file
+1) For a live interface name:
+	 - Command: sudo go run dnsdetect.go -i en0
+	   Explanation:
+	   		- When an interface is provided we listen to live network dns calls only on that particular interface.
+2) For a pcap file:
+	 - Command: sudo go run dnsdetect.go -r output.pcap
+	   Explanation:
+	   		- When an interface is provided we parse the network dns calls in the pcap file and detect the dnsspoofed calls.
+3) No flags provided
+	 - Command: sudo go run dnsdetect.go
+	   Explanation:
+	   		- When no flags are provided we listen to live network dns calls only on the default interface i.e. the first interace in pcap.FindAllDevs().
+
+
+Sample Output:
+	2021-04-11 22:32:18.667878 -0400 EDT  DNS poisining attempt
+	TXID  0x7669   [www.wikipedia.com]
+	Answer1  [192.168.100.4]
+	Answer2  [208.80.154.232]
+
+	2021-04-11 22:32:39.33989 -0400 EDT  DNS poisining attempt
+	TXID  0xfca3   [google.com]
+	Answer1  [192.168.100.4]
+	Answer2  [172.217.7.174]
+
+	2021-04-11 22:32:39.339938 -0400 EDT  DNS poisining attempt
+	TXID  0x6ef   [www.google.com]
+	Answer1  [192.168.100.4]
+	Answer2  [172.253.63.103 172.253.63.104 172.253.63.105 172.253.63.106 172.253.63.147 172.253.63.99]
+
+	2021-04-11 22:32:48.606741 -0400 EDT  DNS poisining attempt
+	TXID  0xcd0e   [www.bankofamerica.com]
+	Answer1  [171.159.116.100]
+	Answer2  [192.168.100.4]
+
+	2021-04-11 22:32:49.676056 -0400 EDT  DNS poisining attempt
+	TXID  0x4e8c   [www.bing.com]
+	Answer1  [192.168.100.4]
+	Answer2  [13.107.21.200 204.79.197.200]
+
+
+Approach/Design:
+1) We read the packet from the live interface or the pcap file depending on the provided flags while executing the program.
+2) We sequentally load the packets into the array by creating a custom obj of the DNS packets using the below object.
+		type DNSPacket struct {
+		    timestamp string
+			timeInSeconds int64
+		    transID uint16
+			srcIP string
+			destIP string
+			srcPort string
+			destPort string 
+			questions []string
+			answers []string
+		}
+
+		var tempPacketsList[] DNSPacket;
+
+3) We regularyly populate the list with the latest request and eliminate all the request that are older than 5 seconds to maintain the efficiency and memory management of the program.
+
+4) We call the checkDuplicateResponses(mostRecentPacket DNSPacket, tempPacketsList []DNSPacket) function for each new dns response from the server. Then we compare the attributes of the new response with the previous responses in the last 5 seconds.
+
+5) We compare the below parameters to ensure if the packet is a duplicate dns response(i.e. if it has a duplicate spoofed response with the same trans id)
+
+	paramteres checked : (1-6 if same)
+		1) transIds
+		2) Src IPS
+		3) Dst IPS
+		4) SRC Port
+		5) DST Port
+		6) Questions
+		7) Answers - If both packets have different answer ips
+
+	If all the above conditions turn out to be true. Then we claim that there was DNS spoofing done for that particular transId and print the details of the responses.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

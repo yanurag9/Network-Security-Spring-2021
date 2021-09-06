@@ -1,0 +1,353 @@
+NS_hw1.txt
+
+
+ 1.1 How many packets does the trace contain?
+ 	Command: sudo tcpdump -n -r hw1.pcap | wc -l
+ 	Approach: wc -l gives the count of lines in the output
+ 	Answer: 32616
+ 
+ 1.2 How many ARP packets and how many UDP packets?
+	Command: sudo tcpdump -n -r hw1.pcap arp | wc -l
+	Approach: adding arp filter in tcpdump command filters gives the list of ARP packets
+	Answer: 11304
+
+	Command: sudo tcpdump -n -r hw1.pcap udp | wc -l
+	Approach: adding udp filter in tcpdump command filters gives the list of UCP packets
+	Answer: 18334
+ 
+ 1.3 How many packets were exchanged between 91.189.90.41 and 192.168.0.200?
+
+	Command: sudo tcpdump -n -r hw1.pcap src 91.189.90.41 and dst 192.168.0.200 | wc -l
+	Approach: Using the (SRC and DST) filters in tcpdump provides the list of packets transferred between the devices with the appropriate IPs
+	Answer: 6
+
+	Command: sudo tcpdump -n -r hw1.pcap src 192.168.0.200 and dst 91.189.90.41 | wc -l
+	Approach: This provides the packets exchanged in the opposite direction
+	Answer: 8	
+
+	So the answer would be 6 + 8 = 14
+ 
+ 1.4 Print the unique source IP addresses found in the trace. 
+
+	Command: sudo tcpdump -n -q -r hw1.pcap ip | awk '{print $3}' | cut -d '.' -f 1-4 | sort | uniq
+	Approach: Filter all lines with IP in it .
+				The third field in each line contains the source IP. 
+				Filter the Ip to contain 4 dot separated numbers.
+				Sort the result to be able to get uniq attributes using the command 'sort | uniq'
+	Answer: 0.0.0.0	
+			1.234.31.20
+			122.154.101.54
+			130.75.16.5
+			159.148.96.184
+			169.254.56.55
+			192.168.0.1
+			192.168.0.10
+			192.168.0.11
+			192.168.0.12
+			192.168.0.2
+			192.168.0.200
+			192.168.0.3
+			192.168.0.5
+			192.168.0.6
+			192.168.0.7
+			194.168.4.100
+			216.137.63.121
+			216.137.63.137
+			46.51.197.88
+			46.51.197.89
+			62.252.170.81
+			62.252.170.91
+			87.230.23.162
+			87.98.246.8
+			91.189.88.33
+			91.189.89.88
+			91.189.90.40
+			91.189.90.41
+			91.189.91.14
+			91.189.91.15
+			91.189.92.190
+			92.240.68.152
+
+
+ 1.5 Print the unique 'private network' (according to RFC1918) source IP
+     addresses found in the trace. 
+
+	Command: sudo tcpdump -n -q -r hw1.pcap ip and src net 192.168.0.0/16 or src net 172.16.0.0/12 or src net 10.0.0.0/8 | awk '{print $3}' | cut -d '.' -f 1-4 | sort |uniq
+	Approach: According the RFC1918 on the private netork ips are the following:
+				192.168.*
+				172.16.*
+				10..0.*
+			So filtering the src ip which have the same prefixes using the src net <IP> command provided in tcpdump.
+			Then Filtering and sorting the contain IPs in the right format and to remove duplicates.
+	Answer: 192.168.0.1
+			192.168.0.10
+			192.168.0.11
+			192.168.0.12
+			192.168.0.2
+			192.168.0.200
+			192.168.0.3
+			192.168.0.5
+			192.168.0.6
+			192.168.0.7
+
+ 
+ 1.6 Print the unique destination IP addresses found in the trace.
+	Command: sudo tcpdump -n -q -r hw1.pcap ip | awk '{print $5}' | cut -d '.' -f 1-4 | sort |uniq 
+	Approach: Filter all lines with IP in it .
+			  The fifth field in each line contains the destination IP. 
+			  Filter the Ip to contain 4 dot separated numbers.
+			  Sort the result to be able to get uniq attributes using the command 'sort | uniq'
+	Answer: 1.234.31.20
+			122.154.101.54
+			130.75.16.5
+			159.148.96.184
+			169.254.255.255
+			192.168.0.12
+			192.168.0.200
+			192.168.0.200:
+			192.168.0.255
+			194.168.4.100
+			216.137.63.121
+			216.137.63.137
+			224.0.0.22:
+			224.0.0.251
+			224.0.0.251:
+			224.0.0.252
+			239.255.255.250
+			255.255.255.255
+			46.51.197.88
+			46.51.197.89
+			62.252.170.81
+			62.252.170.91
+			87.230.23.162
+			87.98.246.8
+			91.189.88.33
+			91.189.89.88
+			91.189.90.40
+			91.189.90.41
+			91.189.91.14
+			91.189.91.15
+			91.189.92.190
+			92.240.68.152
+
+
+ 1.7 What are the top-5 TCP and top-5 UDP destination ports?
+
+ 	TCP
+	Command: sudo tcpdump -n -r hw1.pcap tcp | awk '{print $5}' |cut -d '.' -f 5 | cut -d ':' -f 1| sort |uniq -c | sort -n -r | head -5
+	Approach: 	Filtered the tcpdump to have only tcp traces
+				The fifth element contains the destination 
+				Filtered the ip to only obtain the port numbers of each ip.
+				removed extra colons in some of the port numbers
+				sorted and obtained the distinct ports along with their count using the command 'sort |uniq -c'
+				Sorted with the counts to obtain top used ports and used 'head -5' to print only the top 5.
+   	Answer:	     Count 	Port
+   				 727 	80
+				 697 	54634
+				 346 	49836
+				  61 	47110
+				  36 	40341
+
+ 	UDP
+	Command: sudo tcpdump -n -r hw1.pcap udp | awk '{print $5}' |cut -d '.' -f 5 | cut -d ':' -f 1| sort |uniq -c | sort -n -r | head -5
+	Approach: 	Filtered the tcpdump to have only udp traces
+				The fifth element contains the destination 
+				Filtered the ip to only obtain the port numbers of each ip.
+				removed extra colons in some of the port numbers
+				sorted and obtained the distinct ports along with their count using the command 'sort |uniq -c'
+				Sorted with the counts to obtain top used ports and used 'head -5' to print only the top 5.
+   	Answer:	    Count 	Port
+   				13178 	1900
+				1925 	137
+				1516 	5355
+				 840 	5353
+				 399 	138
+			
+ 
+ 1.8 How many TCP packets have the SYN flag set?
+ 	
+ 	Command: tcpdump -n -r hw1.pcap tcp and 'tcp[tcpflags] & (tcp-syn) == (tcp-syn)' |wc -l
+ 	Approach: Used TCP filter to only obtain TCP packets
+ 			  Added tcp[tcpflags] to filter out only the packets with tcpflags in them.
+ 			  Then filtered the result obtained where tcp flag is set to true.
+ 	Answer: 75
+
+ 1.9 How many TCP connection attempts were made?
+ 	Command: tcpdump -n -r hw1.pcap tcp and 'tcp[tcpflags] & (tcp-syn) == (tcp-syn)' and 'tcp[tcpflags] & (tcp-ack)!=(tcp-ack)' | wc -l
+ 	Approach: Used TCP filter to only obtain TCP packets
+ 			  Added tcp[tcpflags] to filter out only the packets with tcpflags in them.
+ 			  Then filtered the result which has SYN flag true And a false ACK flag as it denotes that the source has sent the initial packet to obtain a connection.
+ 	Answer: 37
+ 
+1.10 Towards which ports were TCP connection attempts made? How many attempts
+     per port?
+     
+	Command: tcpdump -n -r hw1.pcap tcp and 'tcp[tcpflags] & (tcp-syn) == (tcp-syn)' and 'tcp[tcpflags] & (tcp-ack)==(tcp-ack)' | awk '{print $3}'| cut -d '.' -f 5| cut -d ':' -f 1 | sort -n -r | uniq -c 
+	Approach: Used TCP filter to only obtain TCP packets
+ 			  Added tcp[tcpflags] to filter out only the packets with tcpflags in them.
+ 			  Then filtered the result which has SYN flag true And a true ACK flag as it signifies that the connection is made.
+ 			  Then obtained the source IP which are the third elements in each row.
+ 			  Obtained the port of each IP.
+ 			  Sorted and obtained distinct ports along with their counts with the sort and uniq commands.
+	Answer:    	Count 	Port			   
+				2 		9100
+			   	1 		465
+			   	1 		443
+			  	34 		80
+ 
+1.11 How many HTTP GET requests were made? Print the URLs of all HTTP requests
+     for JPG files.
+
+     Number of GET requests:
+     Command: tcpdump -n -r hw1.pcap port 80 and 'tcp[((tcp[12:1] & 0xf0) >> 2):4] = 0x47455420'| wc -l
+     Approach: 	First we filter out using the port 80 to minimise the trace to obtain only HTTP requests
+     			tcp[((tcp[12:1] & 0xf0) >> 2):4] gives us the location of the bytes we are interested in and then select the first bye=tes that has HTTP request type information. and compare it to 0x47455420 is the ASCII equivalent for 'GET'
+     			then obtain the count using wc -l
+     Answer: 94
+
+
+     JPG requests:
+     Command: sudo tcpdump -n -r hw1.pcap port 80 and 'tcp[((tcp[12:1] & 0xf0) >> 2):4] = 0x47455420'| grep 'jpg' | awk '{print $24}'
+     Approach: First we filter out using the port 80 to minimise the trace to obtain only HTTP requests
+     			tcp[((tcp[12:1] & 0xf0) >> 2):4] gives us the location of the bytes we are interested in and then select the first bye=tes that has HTTP request type information. and compare it to 0x47455420 is the ASCII equivalent for 'GET'
+     			Then we grep the result with 'jpg' to obtain all requests with jpg
+     			Then print the 24th Value in each lines as it contains the URL
+     Answer: 
+			http://pic.leech.it/i/f166c/479246b0asttas.jpg
+			/i/f166c/479246b0asttas.jpg
+			http://ecx.images-amazon.com/images/I/41oZ1XsiOAL._SL500_AA300_.jpg
+			http://www.nature.com/news/2009/090527/images/459492a-i1.0.jpg
+			/news/2009/090527/images/459492a-i1.0.jpg
+
+
+1.12 When (date and time) was the first and last packet of the trace sent?
+
+	First packet time:
+	Command: sudo tcpdump -n -tttt -r hw1.pcap | head -1 | awk '{print $1,$2}'
+	Approach: Used -tttt to obtain human readable time
+			  used head command to get the first line in the trace.
+			  Printed the first two values in the line which denote the date and time the request was made.
+	Answer: 2013-01-12 11:37:42.871346
+
+	Last packet time:
+	Command: sudo tcpdump -n -tttt -r hw1.pcap | tail -1 | awk '{print $1,$2}'
+	Approach: Used -tttt to obtain human readable time
+			  used tail command to get the last line in the trace.
+			  Printed the first two values in the line which denote the date and time the request was made.
+	Answer: 2013-01-14 13:27:03.691498
+
+1.13 What is the brand of the device that sent most of the packets? What is its
+     IP address?
+
+	Command: sudo tcpdump -n -e -r hw1.pcap | awk '{print $2}' |cut -d ',' -f1 | sort -n | uniq -c| sort -n -r | head -1
+	Approach: used -e option to print all the details of the packet.
+			  Filtered the result as the second value contains the MAC address of the source device.
+			  Removed extra characters from the result.
+			  sorted and obtained distinct mac address from the list.
+			  Sorted the list with count in descending order.
+			  Used head command to obtain the MAC address with the highest count
+	Answer:	Count 	MAC address
+			19743 	c4:3d:c7:17:6f:9b
+
+	Then search the mac in the website. It will fetch the router brand details:
+	https://dnschecker.org/mac-lookup.php
+
+	Result when searched with mac address:
+	Address Prefix	C4:3D:C7
+	Vendor / Company	Netgear
+	Start Address	C43DC7000000
+	End Address	C43DC7FFFFFF
+	Company Address	350 East Plumeria Drive San Jose Ca 95134 Us
+
+	To fetch IP:
+	IP address can be fetched using grep command with the mac address:
+	sudo tcpdump -n -e -r hw1.pcap | grep c4:3d:c7:17:6f:9b| head -1
+		- 11:37:42.871346 c4:3d:c7:17:6f:9b > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 192.168.0.12 tell 192.168.0.1, length 46
+
+	IP: 192.168.0.1. The packet was sent by the the device with IP 192.168.0.1 to know who has the other ip.
+
+1.14 Report the distribution of Ethernet packet sizes (how many packets of size
+     X exist in the trace, for all values of X in the trace).
+
+	Command: sudo tcpdump -n -e -r hw1.pcap 'ether[0]=1' | awk '{print $9}'| cut -d ':' -f1 | sort | uniq -c | sort -n -k 2
+	Approach: Filter the packets to obtain only ehternet packets
+			  The 9th value in each line contains the length of the packet.
+			  Removed ':' character to clean result.
+			  Sorted and then used uniq command to obtain unique lengths and count for each length.
+			  Sorted the data to display the list in increasing length of packet sizes for each x.
+	Answer:Count Length
+			  906 60
+			  10 62
+			 232 63
+			 887 64
+			   4 65
+			 375 66
+			   8 68
+			   6 69
+			   3 70
+			   2 76
+			  50 81
+			  43 84
+			 333 91
+			  10 107
+			  28 119
+			 121 120
+			   7 125
+			  15 127
+			   6 142
+			   1 144
+			   7 149
+			  10 154
+			   1 156
+			  60 165
+			  62 167
+			  12 168
+			 146 175
+			  17 202
+			   2 208
+			   2 220
+			   8 231
+			   6 282
+			   9 284
+			   2 288
+			  15 302
+			  12 307
+			  23 315
+			  85 318
+			  85 326
+			2759 331
+			   1 335
+			  88 338
+			2749 340
+			  86 342
+			  86 362
+			  88 386
+			  87 390
+			  87 392
+			  86 394
+			2759 395
+			  85 398
+			2758 405
+			  33 460
+			 164 475
+			  10 476
+			 164 484
+			  10 485
+			  13 489
+			 158 527
+			  10 528
+			 162 539
+			  10 540
+			 155 541
+			  10 542
+			  17 551
+			 161 555
+			  10 556
+			  32 602
+			  12 666
+			  22 698
+			   8 816
+			   5 817
+			  40 1033
+			   6 1034
+			   4 1035

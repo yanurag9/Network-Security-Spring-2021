@@ -1,0 +1,65 @@
+NS-HW4-113070893 Report
+
+Name: Anurag Yepuri
+SBU ID: 113070893
+
+Plugboard proxy 
+
+
+Server:
+
+Command: go run pbproxy.go [-l listenport] -p pwdfile destination port
+
+  -l  Reverse-proxy mode: listen for inbound connections on <listenport> and
+      relay them to <destination>:<port>
+
+  -p  Use the ASCII text passphrase contained in <pwdfile>
+
+Example: go run pbproxy.go -l 2222 -p passFile.txt localhost 22
+
+The above command listens to port 2222 for any traffic. The traffic from the pbproxy client is encrypted. So, it decrypts the input and then forwards the decrypted data to port 22(ssh port). We have another go routine in the code which keeps listening to the ssh port for any response. It collects the response and forwards back the response to the pbproxy client by encrypting the response.
+
+Steps:
+1) On startup the <listen_port> and pwd file is loaded and set in variables.
+2) Creates a listener on port 2222 to listen to any calls from clients.
+3) Also creates a connection socket to the ssh server to forward any requests to.
+4) When any connection request is made to the server. It accepts the connection and obtains a socket connection object.
+5) It spans two threads to listen on each side of the pbproxy server (read from client and ssh server).
+6) When a call arrives from client - It is in encrypted form. So it uses the pbkdf2 key generated from pass key to decrypt the request that was encrypted using aes256 encryption. It decrypts the request and writes on the ssh server.
+7) We also spin up another thread on request arrival to listen for responses from ssh server for that client. When any response arrives from the ssh server, we encrypt it and forward it back to the client.
+
+The pbproxyS server creates a secured tunnel to carry the traffic from client -> pbproxy -> ssh server securely.
+
+
+
+Client:
+
+Commmand: ssh -o "ProxyCommand pbproxy -p pwdfile <server host> <port>" localhost
+
+  -p  Use the ASCII text passphrase contained in <pwdfile>
+
+Example: ssh -o "ProxyCommand go run pbproxy.go -p passFile.txt 10.211.55.10 2222" localhost
+
+The pbproxy client takes encrypted std input from the console and forwards the traffic to the pbproxy server server running on the port 2222 where it is decrypted and forwarded to the ssh server that the server is configured to. It also responds with the response from the pbproxy server. 
+
+Steps:
+0) Use the inputs in the command to fetch the password phrase from the file and get the server host and port numbers.
+1) Create a socket to the pbproxy-S application running on the host given in command by dialing to the host.
+2) Listen to the standard input on the client's terminal. If any command is given it is read using the bufio reader and is sent to the pbproxy server after encrypting it.
+3) We also spin up a thread after the socket connection is successful to listen to any responses from the server. This thread reads the response on the socket and decrypts it to present to the user on the terminal.
+
+
+Design flow:
+
+ssh <--stdin/stdout--> pbproxy-c <--socket 1--> pbproxy-s <--socket 2--> sshd
+\______________________________/                \___________________________/
+             client                                        server           
+
+
+Programming languages used: GoLang
+
+
+Tested using environment:
+client - apple big sur 11.2.3
+server - kali linux 2021.1
+Go version - go 1.15.9 

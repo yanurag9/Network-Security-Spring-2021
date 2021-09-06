@@ -1,0 +1,215 @@
+
+The main function in the code contains the below functionalities:
+
+1) Read input from the Command line using go lang flags.
+
+2) Filtered the flags and expression to obtain string values for each flag and BPFFilter Expression.
+	- Obtained the -r, -s, -i g\flag values using flag.parse() and used them as pointers for further processing
+	- Parsed through the command line input. Ignored all the flags and considered everything else to be expression
+
+3) If -r flag is provided and a valid file is provided. Then used the "pcap.OpenOffline(fileName)" function provided in pcap library to read the contents of the file. If there is no error while parsing the file. Then applied the BPF filter if there is any.
+
+4) If -i flag is present. I have checked if the device exists. 
+	a) If it does not exist return back an error message stating that the device does not exist. And also print all the existing devices that can be used.
+	b) If the device exist, then i am using the "pcap.OpenLive(deviceName, int32(1600), false, pcap.BlockForever)" function to get the live stream of packets.
+	c) If both the -r and -i flags are provided. Then the -r takes precedence.
+	d) If -r and -i are not provided then the first device in the "pcap.FindAllDevs()" is used to get dumps.
+
+The below is the decription on how the print Packet details works:
+
+	- The data inside each packet is split into multiple layers. So we fetch different details from different layers for printing.
+
+	Ethernet Layer: 
+		timeStamp = packet.Metadata().Timestamp.String();
+		srcMac = ethernetPacket.SrcMAC.String()
+		dstMac = ethernetPacket.DstMAC.String()
+		typeOfReq = "0x" + hex.EncodeToString(ethernetPacket.BaseLayer.Contents[12:14])
+		packetLength = packet.Metadata().Length
+		payloadInBytes = (ethernetPacket.BaseLayer.Payload)
+
+	IPv4 Layer:
+		srcIP = ip.SrcIP.String()
+		dstIP = ip.DstIP.String()
+		protocolType = ip.Protocol.String()
+
+
+	TCP layer: ( if in case it exists)
+		srcPort = tcp.SrcPort.String()
+		dstPort = tcp.DstPort.String()
+		TCPFlags: Parsing through all the TCP flag booleans and printing them
+
+	UDP:
+		srcPort = udp.SrcPort.String()
+		dstPort = udp.DstPort.String()
+
+		Depending on the type of the packet. Appropriate layers are used to grab all the data required.
+
+	- The -s filter is applied in the packet payload using "strings.Contains()" to only print the packets that match the string provided.
+
+	- The data is printed in different formats depending on the available data.
+
+	- hex.Dump() function is used to convert the hex value of the payload and print on the console.
+
+
+Below listed are all the libraries that we used for performing the required task:
+	"fmt"
+	"flag"
+	"log"
+	"encoding/hex"
+	"os"
+	"strings"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/layers"
+
+
+Examples outputs: 
+
+1)
+anuragyepuri@Anurags-MacBook-Pro NS-HW2-113070893-submission % go run mydump.go -r ../hw1.pcap  -s "jpg" tcp
+2013-01-12 22:30:48.908526 -0500 EST c4:3d:c7:17:6f:9b -> 00:0c:29:e9:94:8e type 0x0800 len 177 92.240.68.152:9485 -> 192.168.0.200:80(http) TCP ACK PSH 
+00000000  45 00 00 a3 a3 da 40 00  37 06 3c 82 5c f0 44 98  |E.....@.7.<.\.D.|
+00000010  c0 a8 00 c8 25 0d 00 50  ef 75 98 2b 7f 92 4f 84  |....%..P.u.+..O.|
+00000020  80 18 00 0c 8c 49 00 00  01 01 08 0a 11 e8 3e fe  |.....I........>.|
+00000030  00 9e ec a6 47 45 54 20  68 74 74 70 3a 2f 2f 70  |....GET http://p|
+00000040  69 63 2e 6c 65 65 63 68  2e 69 74 2f 69 2f 66 31  |ic.leech.it/i/f1|
+00000050  36 36 63 2f 34 37 39 32  34 36 62 30 61 73 74 74  |66c/479246b0astt|
+00000060  61 73 2e 6a 70 67 20 48  54 54 50 2f 31 2e 31 0a  |as.jpg HTTP/1.1.|
+00000070  55 73 65 72 2d 41 67 65  6e 74 3a 20 77 65 62 63  |User-Agent: webc|
+00000080  6f 6c 6c 61 67 65 2f 31  2e 31 33 35 61 0a 48 6f  |ollage/1.135a.Ho|
+00000090  73 74 3a 20 70 69 63 2e  6c 65 65 63 68 2e 69 74  |st: pic.leech.it|
+000000a0  0a 0a 00                                          |...|
+
+2013-01-12 22:30:49.032953 -0500 EST 00:0c:29:e9:94:8e -> c4:3d:c7:17:6f:9b type 0x0800 len 229 192.168.0.200:40341 -> 87.98.246.8:80(http) TCP ACK PSH 
+00000000  45 00 00 d7 8a 80 40 00  40 06 a0 c5 c0 a8 00 c8  |E.....@.@.......|
+00000010  57 62 f6 08 9d 95 00 50  35 6e 66 b0 d3 f2 63 38  |Wb.....P5nf...c8|
+00000020  80 18 03 91 33 f1 00 00  01 01 08 0a 00 9e ec d8  |....3...........|
+00000030  67 ff b5 c8 47 45 54 20  2f 69 2f 66 31 36 36 63  |g...GET /i/f166c|
+00000040  2f 34 37 39 32 34 36 62  30 61 73 74 74 61 73 2e  |/479246b0asttas.|
+00000050  6a 70 67 20 48 54 54 50  2f 31 2e 30 0d 0a 55 73  |jpg HTTP/1.0..Us|
+00000060  65 72 2d 41 67 65 6e 74  3a 20 4d 6f 7a 69 6c 6c  |er-Agent: Mozill|
+00000070  61 2f 34 2e 30 20 28 63  6f 6d 70 61 74 69 62 6c  |a/4.0 (compatibl|
+00000080  65 3b 20 4d 53 49 45 20  36 2e 30 3b 20 57 69 6e  |e; MSIE 6.0; Win|
+00000090  64 6f 77 73 20 4e 54 20  35 2e 31 29 0d 0a 41 63  |dows NT 5.1)..Ac|
+000000a0  63 65 70 74 3a 20 2a 2f  2a 0d 0a 48 6f 73 74 3a  |cept: */*..Host:|
+000000b0  20 70 69 63 2e 6c 65 65  63 68 2e 69 74 3a 38 30  | pic.leech.it:80|
+000000c0  0d 0a 43 6f 6e 6e 65 63  74 69 6f 6e 3a 20 63 6c  |..Connection: cl|
+000000d0  6f 73 65 0d 0a 0d 0a                              |ose....|
+
+2013-01-12 22:31:19.154432 -0500 EST c4:3d:c7:17:6f:9b -> 00:0c:29:e9:94:8e type 0x0800 len 207 92.240.68.152:17260 -> 192.168.0.200:80(http) TCP ACK PSH 
+00000000  45 00 00 c1 97 12 40 00  37 06 49 2c 5c f0 44 98  |E.....@.7.I,\.D.|
+00000010  c0 a8 00 c8 43 6c 00 50  0e 46 cb 69 79 e3 6d 3d  |....Cl.P.F.iy.m=|
+00000020  80 18 00 0c 0c a2 00 00  01 01 08 0a 11 e8 5c 87  |..............\.|
+00000030  00 9f 0a 33 47 45 54 20  68 74 74 70 3a 2f 2f 65  |...3GET http://e|
+00000040  63 78 2e 69 6d 61 67 65  73 2d 61 6d 61 7a 6f 6e  |cx.images-amazon|
+00000050  2e 63 6f 6d 2f 69 6d 61  67 65 73 2f 49 2f 34 31  |.com/images/I/41|
+00000060  6f 5a 31 58 73 69 4f 41  4c 2e 5f 53 4c 35 30 30  |oZ1XsiOAL._SL500|
+00000070  5f 41 41 33 30 30 5f 2e  6a 70 67 20 48 54 54 50  |_AA300_.jpg HTTP|
+00000080  2f 31 2e 31 0a 55 73 65  72 2d 41 67 65 6e 74 3a  |/1.1.User-Agent:|
+00000090  20 77 65 62 63 6f 6c 6c  61 67 65 2f 31 2e 31 33  | webcollage/1.13|
+000000a0  35 61 0a 48 6f 73 74 3a  20 65 63 78 2e 69 6d 61  |5a.Host: ecx.ima|
+000000b0  67 65 73 2d 61 6d 61 7a  6f 6e 2e 63 6f 6d 0a 0a  |ges-amazon.com..|
+000000c0  00                                                |.|
+
+2013-01-12 22:32:21.149589 -0500 EST c4:3d:c7:17:6f:9b -> 00:0c:29:e9:94:8e type 0x0800 len 195 92.240.68.152:22272 -> 192.168.0.200:80(http) TCP ACK PSH 
+00000000  45 00 00 b5 54 ee 40 00  37 06 8b 5c 5c f0 44 98  |E...T.@.7..\\.D.|
+00000010  c0 a8 00 c8 57 00 00 50  49 3d cd f0 a3 fd 20 27  |....W..PI=.... '|
+00000020  80 18 00 0c 83 ba 00 00  01 01 08 0a 11 e8 99 12  |................|
+00000030  00 9f 46 be 47 45 54 20  68 74 74 70 3a 2f 2f 77  |..F.GET http://w|
+00000040  77 77 2e 6e 61 74 75 72  65 2e 63 6f 6d 2f 6e 65  |ww.nature.com/ne|
+00000050  77 73 2f 32 30 30 39 2f  30 39 30 35 32 37 2f 69  |ws/2009/090527/i|
+00000060  6d 61 67 65 73 2f 34 35  39 34 39 32 61 2d 69 31  |mages/459492a-i1|
+00000070  2e 30 2e 6a 70 67 20 48  54 54 50 2f 31 2e 31 0a  |.0.jpg HTTP/1.1.|
+00000080  55 73 65 72 2d 41 67 65  6e 74 3a 20 77 65 62 63  |User-Agent: webc|
+00000090  6f 6c 6c 61 67 65 2f 31  2e 31 33 35 61 0a 48 6f  |ollage/1.135a.Ho|
+000000a0  73 74 3a 20 77 77 77 2e  6e 61 74 75 72 65 2e 63  |st: www.nature.c|
+000000b0  6f 6d 0a 0a 00                                    |om...|
+
+2013-01-13 05:36:15.266947 -0500 EST 00:0c:29:e9:94:8e -> c4:3d:c7:17:6f:9b type 0x0800 len 396 192.168.0.200:42990 -> 62.252.170.91:80(http) TCP ACK PSH 
+00000000  45 00 01 7e 66 96 40 00  40 06 28 1c c0 a8 00 c8  |E..~f.@.@.(.....|
+00000010  3e fc aa 5b a7 ee 00 50  0b 8e 2a 54 49 8b 93 99  |>..[...P..*TI...|
+00000020  80 18 03 91 bb 34 00 00  01 01 08 0a 01 00 4c ce  |.....4........L.|
+00000030  76 f6 45 aa 47 45 54 20  2f 6e 65 77 73 2f 32 30  |v.E.GET /news/20|
+00000040  30 39 2f 30 39 30 35 32  37 2f 69 6d 61 67 65 73  |09/090527/images|
+00000050  2f 34 35 39 34 39 32 61  2d 69 31 2e 30 2e 6a 70  |/459492a-i1.0.jp|
+00000060  67 20 48 54 54 50 2f 31  2e 31 0d 0a 48 6f 73 74  |g HTTP/1.1..Host|
+00000070  3a 20 77 77 77 2e 6e 61  74 75 72 65 2e 63 6f 6d  |: www.nature.com|
+00000080  0d 0a 55 73 65 72 2d 41  67 65 6e 74 3a 20 4d 6f  |..User-Agent: Mo|
+00000090  7a 69 6c 6c 61 2f 35 2e  30 20 28 58 31 31 3b 20  |zilla/5.0 (X11; |
+000000a0  55 62 75 6e 74 75 3b 20  4c 69 6e 75 78 20 69 36  |Ubuntu; Linux i6|
+000000b0  38 36 3b 20 72 76 3a 31  37 2e 30 29 20 47 65 63  |86; rv:17.0) Gec|
+000000c0  6b 6f 2f 32 30 31 30 30  31 30 31 20 46 69 72 65  |ko/20100101 Fire|
+000000d0  66 6f 78 2f 31 37 2e 30  0d 0a 41 63 63 65 70 74  |fox/17.0..Accept|
+000000e0  3a 20 74 65 78 74 2f 68  74 6d 6c 2c 61 70 70 6c  |: text/html,appl|
+000000f0  69 63 61 74 69 6f 6e 2f  78 68 74 6d 6c 2b 78 6d  |ication/xhtml+xm|
+00000100  6c 2c 61 70 70 6c 69 63  61 74 69 6f 6e 2f 78 6d  |l,application/xm|
+00000110  6c 3b 71 3d 30 2e 39 2c  2a 2f 2a 3b 71 3d 30 2e  |l;q=0.9,*/*;q=0.|
+00000120  38 0d 0a 41 63 63 65 70  74 2d 4c 61 6e 67 75 61  |8..Accept-Langua|
+00000130  67 65 3a 20 65 6e 2d 55  53 2c 65 6e 3b 71 3d 30  |ge: en-US,en;q=0|
+00000140  2e 35 0d 0a 41 63 63 65  70 74 2d 45 6e 63 6f 64  |.5..Accept-Encod|
+00000150  69 6e 67 3a 20 67 7a 69  70 2c 20 64 65 66 6c 61  |ing: gzip, defla|
+00000160  74 65 0d 0a 43 6f 6e 6e  65 63 74 69 6f 6e 3a 20  |te..Connection: |
+00000170  6b 65 65 70 2d 61 6c 69  76 65 0d 0a 0d 0a        |keep-alive....|
+
+
+2) 
+anuragyepuri@Anurags-MacBook-Pro NS-HW2-113070893-submission % go run mydump.go -r ../hw1.pcap  -s "jpg" src 192.168
+2013-01-12 22:30:49.032953 -0500 EST 00:0c:29:e9:94:8e -> c4:3d:c7:17:6f:9b type 0x0800 len 229 192.168.0.200:40341 -> 87.98.246.8:80(http) TCP ACK PSH 
+00000000  45 00 00 d7 8a 80 40 00  40 06 a0 c5 c0 a8 00 c8  |E.....@.@.......|
+00000010  57 62 f6 08 9d 95 00 50  35 6e 66 b0 d3 f2 63 38  |Wb.....P5nf...c8|
+00000020  80 18 03 91 33 f1 00 00  01 01 08 0a 00 9e ec d8  |....3...........|
+00000030  67 ff b5 c8 47 45 54 20  2f 69 2f 66 31 36 36 63  |g...GET /i/f166c|
+00000040  2f 34 37 39 32 34 36 62  30 61 73 74 74 61 73 2e  |/479246b0asttas.|
+00000050  6a 70 67 20 48 54 54 50  2f 31 2e 30 0d 0a 55 73  |jpg HTTP/1.0..Us|
+00000060  65 72 2d 41 67 65 6e 74  3a 20 4d 6f 7a 69 6c 6c  |er-Agent: Mozill|
+00000070  61 2f 34 2e 30 20 28 63  6f 6d 70 61 74 69 62 6c  |a/4.0 (compatibl|
+00000080  65 3b 20 4d 53 49 45 20  36 2e 30 3b 20 57 69 6e  |e; MSIE 6.0; Win|
+00000090  64 6f 77 73 20 4e 54 20  35 2e 31 29 0d 0a 41 63  |dows NT 5.1)..Ac|
+000000a0  63 65 70 74 3a 20 2a 2f  2a 0d 0a 48 6f 73 74 3a  |cept: */*..Host:|
+000000b0  20 70 69 63 2e 6c 65 65  63 68 2e 69 74 3a 38 30  | pic.leech.it:80|
+000000c0  0d 0a 43 6f 6e 6e 65 63  74 69 6f 6e 3a 20 63 6c  |..Connection: cl|
+000000d0  6f 73 65 0d 0a 0d 0a                              |ose....|
+
+2013-01-13 05:36:15.266947 -0500 EST 00:0c:29:e9:94:8e -> c4:3d:c7:17:6f:9b type 0x0800 len 396 192.168.0.200:42990 -> 62.252.170.91:80(http) TCP ACK PSH 
+00000000  45 00 01 7e 66 96 40 00  40 06 28 1c c0 a8 00 c8  |E..~f.@.@.(.....|
+00000010  3e fc aa 5b a7 ee 00 50  0b 8e 2a 54 49 8b 93 99  |>..[...P..*TI...|
+00000020  80 18 03 91 bb 34 00 00  01 01 08 0a 01 00 4c ce  |.....4........L.|
+00000030  76 f6 45 aa 47 45 54 20  2f 6e 65 77 73 2f 32 30  |v.E.GET /news/20|
+00000040  30 39 2f 30 39 30 35 32  37 2f 69 6d 61 67 65 73  |09/090527/images|
+00000050  2f 34 35 39 34 39 32 61  2d 69 31 2e 30 2e 6a 70  |/459492a-i1.0.jp|
+00000060  67 20 48 54 54 50 2f 31  2e 31 0d 0a 48 6f 73 74  |g HTTP/1.1..Host|
+00000070  3a 20 77 77 77 2e 6e 61  74 75 72 65 2e 63 6f 6d  |: www.nature.com|
+00000080  0d 0a 55 73 65 72 2d 41  67 65 6e 74 3a 20 4d 6f  |..User-Agent: Mo|
+00000090  7a 69 6c 6c 61 2f 35 2e  30 20 28 58 31 31 3b 20  |zilla/5.0 (X11; |
+000000a0  55 62 75 6e 74 75 3b 20  4c 69 6e 75 78 20 69 36  |Ubuntu; Linux i6|
+000000b0  38 36 3b 20 72 76 3a 31  37 2e 30 29 20 47 65 63  |86; rv:17.0) Gec|
+000000c0  6b 6f 2f 32 30 31 30 30  31 30 31 20 46 69 72 65  |ko/20100101 Fire|
+000000d0  66 6f 78 2f 31 37 2e 30  0d 0a 41 63 63 65 70 74  |fox/17.0..Accept|
+000000e0  3a 20 74 65 78 74 2f 68  74 6d 6c 2c 61 70 70 6c  |: text/html,appl|
+000000f0  69 63 61 74 69 6f 6e 2f  78 68 74 6d 6c 2b 78 6d  |ication/xhtml+xm|
+00000100  6c 2c 61 70 70 6c 69 63  61 74 69 6f 6e 2f 78 6d  |l,application/xm|
+00000110  6c 3b 71 3d 30 2e 39 2c  2a 2f 2a 3b 71 3d 30 2e  |l;q=0.9,*/*;q=0.|
+00000120  38 0d 0a 41 63 63 65 70  74 2d 4c 61 6e 67 75 61  |8..Accept-Langua|
+00000130  67 65 3a 20 65 6e 2d 55  53 2c 65 6e 3b 71 3d 30  |ge: en-US,en;q=0|
+00000140  2e 35 0d 0a 41 63 63 65  70 74 2d 45 6e 63 6f 64  |.5..Accept-Encod|
+00000150  69 6e 67 3a 20 67 7a 69  70 2c 20 64 65 66 6c 61  |ing: gzip, defla|
+00000160  74 65 0d 0a 43 6f 6e 6e  65 63 74 69 6f 6e 3a 20  |te..Connection: |
+00000170  6b 65 65 70 2d 61 6c 69  76 65 0d 0a 0d 0a        |keep-alive....|
+
+
+3)
+anuragyepuri@Anurags-MacBook-Pro NS-HW2-113070893-submission % sudo go run mydump.go -i en0 arp
+Password:
+2021-03-12 01:08:08.036274 -0500 EST aa:bb:cc:dd:ee:ff -> ff:ff:ff:ff:ff:ff type 0x0806 len 56 
+00000000  00 01 08 00 06 04 00 01  aa bb cc dd ee ff ac 18  |................|
+00000010  10 01 00 00 00 00 00 00  ac 18 10 01 8b 2b 0a f5  |.............+..|
+00000020  c7 fd 0a f5 c7 ff 00 89  00 00                    |..........|
+
+4)
+anuragyepuri@Anurags-MacBook-Pro NS-HW2-113070893-submission % go run mydump.go -r ../hw1.pcap  icmp                
+2013-01-14 12:42:31.752299 -0500 EST c4:3d:c7:17:6f:9b -> 00:0c:29:e9:94:8e type 0x0800 len 90 1.234.31.20 -> 192.168.0.200 ICMPv4 
+00000000  45 00 00 4c eb 4a 00 00  2f 01 bd f8 01 ea 1f 14  |E..L.J../.......|
+00000010  c0 a8 00 c8 03 0a 95 2a  00 00 00 00 45 00 00 30  |.......*....E..0|
+00000020  00 00 40 00 2e 06 6a 5a  c0 a8 00 c8 01 ea 1f 14  |..@...jZ........|
+00000030  00 50 7b 81 bd cd 09 c6  3a 35 22 b0 70 12 39 08  |.P{.....:5".p.9.|
+00000040  11 ab 00 00 02 04 05 b4  01 01 04 02              |............|
